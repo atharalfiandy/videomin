@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Videomin Interlacing</title>
+    <style>
+        :root {
+            --bg: #121212;
+            --panel: #1e1e1e;
+            --text: #e0e0e0;
+            --accent: #007acc;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 { margin-bottom: 5px; text-align: center; }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            max-width: 1200px;
+            width: 100%;
+            justify-content: center;
+        }
+        .controls {
+            background: var(--panel);
+            padding: 20px;
+            border-radius: 8px;
+            width: 340px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .control-group { margin-bottom: 15px; }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+        input[type="range"], input[type="file"], select { 
+            width: 100%; 
+            box-sizing: border-box;
+        }
+        select {
+            background: #2a2a2a;
+            color: var(--text);
+            border: 1px solid #444;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        .preview-container {
+            background: var(--panel);
+            padding: 20px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            flex-grow: 1;
+        }
+        canvas {
+            max-width: 100%;
+            background: #000;
+            border: 1px solid #333;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        button:hover { background: #005f9e; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        .status { margin-top: 10px; font-size: 0.85em; color: #aaa; text-align: center; }
+        footer {
+            margin-top: 40px;
+            font-size: 0.8em;
+            color: #666;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Videomin UHQ Processor</h1>
+    <p style="color: #888; margin-bottom: 30px; text-align: center;">Interlacing, Aspect Ratio, & Custom FPS Export</p>
+
+    <div class="container">
+        <div class="controls">
+            <div class="control-group">
+                <label for="videoUpload">Upload Video (with Audio)</label>
+                <input type="file" id="videoUpload" accept="video/*">
+            </div>
+            
+            <div class="control-group">
+                <label for="qualitySelect">Video Quality</label>
+                <select id="qualitySelect">
+                    <option value="186">186p Ultra High Quality</option>
+                    <option value="240">240p Ultra High Quality</option>
+                    <option value="360">360p Ultra High Quality</option>
+                    <option value="480">480p Ultra High Quality</option>
+                    <option value="720">720p Ultra High Quality</option>
+                    <option value="1080" selected>1080p Ultra High Quality</option>
+                    <option value="2160">4K Ultra High Quality</option>
+                    <option value="4320">8K Ultra High Quality</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label for="aspectSelect">Aspect Ratio</label>
+                <select id="aspectSelect">
+                    <option value="original" selected>Original</option>
+                    <option value="16:9">16:9</option>
+                    <option value="4:3">4:3</option>
+                    <option value="1:1">1:1</option>
+                    <option value="9:16">9:16 (Vertical)</option>
+                    <option value="21:9">21:9 (Ultrawide)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="fpsSelect">Export FPS</label>
+                <select id="fpsSelect">
+                    <option value="14">14 FPS</option>
+                    <option value="24">24 FPS</option>
+                    <option value="25">25 FPS</option>
+                    <option value="30" selected>30 FPS</option>
+                    <option value="50">50 FPS</option>
+                    <option value="60">60 FPS</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="volumeSlider">Volume: <span id="volVal">100%</span></label>
+                <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1">
+            </div>
+            <div class="control-group">
+                <label for="motionBlur">Motion Blur Intensity: <span id="blurVal">0</span></label>
+                <input type="range" id="motionBlur" min="0" max="0.9" step="0.05" value="0">
+            </div>
+            <div class="control-group">
+                <label for="interlaceSize">Interlacing Size (px): <span id="sizeVal">0</span></label>
+                <input type="range" id="interlaceSize" min="0" max="20" step="1" value="0">
+            </div>
+            <div class="control-group">
+                <label for="palShift">PAL Field Shift (X-Offset): <span id="shiftVal">0</span></label>
+                <input type="range" id="palShift" min="0" max="50" step="1" value="0">
+            </div>
+            <div class="control-group">
+                <label for="dropFields">Drop Alternate Fields (Blank)</label>
+                <input type="checkbox" id="dropFields">
+            </div>
+            <button id="playBtn" disabled="">Play / Pause Preview</button>
+            <button id="downloadBtn" disabled="">Download Processed Video</button>
+            <div id="statusText" class="status">Waiting for video...</div>
+        </div>
+
+        <div class="preview-container">
+            <canvas id="outCanvas" width="640" height="360"></canvas>
+            <video id="sourceVideo" style="display: none;" crossorigin="anonymous"></video>
+        </div>
+    </div>
+
+    <footer>© 2026 copyright videomin</footer>
+
+    <script>
+        const videoInput = document.getElementById('videoUpload');
+        const sourceVideo = document.getElementById('sourceVideo');
+        const outCanvas = document.getElementById('outCanvas');
+        const ctx = outCanvas.getContext('2d', { willReadFrequently: true });
+        
+        // Controls
+        const volSlider = document.getElementById('volumeSlider');
+        const blurSlider = document.getElementById('motionBlur');
+        const sizeSlider = document.getElementById('interlaceSize');
+        const shiftSlider = document.getElementById('palShift');
+        const dropCheckbox = document.getElementById('dropFields');
+        const playBtn = document.getElementById('playBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const statusText = document.getElementById('statusText');
+        
+        const qualitySelect = document.getElementById('qualitySelect');
+        const aspectSelect = document.getElementById('aspectSelect');
+        const fpsSelect = document.getElementById('fpsSelect');
+
+        // Display Spans
+        const volVal = document.getElementById('volVal');
+        const blurVal = document.getElementById('blurVal');
+        const sizeVal = document.getElementById('sizeVal');
+        const shiftVal = document.getElementById('shiftVal');
+
+        // Buffers for effects
+        const prevFrameCanvas = document.createElement('canvas');
+        const prevCtx = prevFrameCanvas.getContext('2d', { willReadFrequently: true });
+        
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+
+        const blurCanvas = document.createElement('canvas');
+        const blurCtx = blurCanvas.getContext('2d', { willReadFrequently: true });
+
+        let animationId;
+        let isProcessing = false;
+        let mediaRecorder;
+        let recordedChunks = [];
+
+        // Web Audio API Variables
+        let audioCtx;
+        let audioDest;
+        let sourceNode;
+
+        // Update Labels
+        volSlider.addEventListener('input', (e) => {
+            sourceVideo.volume = e.target.value;
+            volVal.textContent = Math.round(e.target.value * 100) + '%';
+        });
+        blurSlider.addEventListener('input', (e) => blurVal.textContent = e.target.value);
+        sizeSlider.addEventListener('input', (e) => sizeVal.textContent = e.target.value);
+        shiftSlider.addEventListener('input', (e) => shiftVal.textContent = e.target.value);
+
+        // Update Canvas Size based on Quality and Aspect Ratio
+        function updateCanvasSize() {
+            if (!sourceVideo.videoWidth) return;
+            
+            let h = parseInt(qualitySelect.value);
+            let w;
+            const aspect = aspectSelect.value;
+            
+            if (aspect === 'original') {
+                const origAspect = sourceVideo.videoWidth / sourceVideo.videoHeight;
+                w = Math.round(h * origAspect);
+            } else {
+                const [num, den] = aspect.split(':').map(Number);
+                w = Math.round(h * (num / den));
+            }
+            
+            outCanvas.width = w;
+            outCanvas.height = h;
+            prevFrameCanvas.width = w;
+            prevFrameCanvas.height = h;
+            tempCanvas.width = w;
+            tempCanvas.height = h;
+            blurCanvas.width = w;
+            blurCanvas.height = h;
+            
+            statusText.textContent = `Resolution set to ${w}x${h}`;
+        }
+
+        qualitySelect.addEventListener('change', updateCanvasSize);
+        aspectSelect.addEventListener('change', updateCanvasSize);
+
+        // Handle File Upload
+        videoInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const url = URL.createObjectURL(file);
+            sourceVideo.src = url;
+            
+            sourceVideo.onloadedmetadata = () => {
+                updateCanvasSize();
+                blurCtx.drawImage(sourceVideo, 0, 0, outCanvas.width, outCanvas.height); // Initialize blur frame
+
+                playBtn.disabled = false;
+                downloadBtn.disabled = false;
+                statusText.textContent = "Ready.";
+                renderFrame(); 
+            };
+        });
+
+        // Setup Audio Context
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                sourceNode = audioCtx.createMediaElementSource(sourceVideo);
+                audioDest = audioCtx.createMediaStreamDestination();
+                sourceNode.connect(audioDest);
+                sourceNode.connect(audioCtx.destination);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Play/Pause
+        playBtn.addEventListener('click', () => {
+            initAudio(); 
+            if (sourceVideo.paused) {
+                sourceVideo.play();
+                processVideo();
+                playBtn.textContent = "Pause Preview";
+            } else {
+                sourceVideo.pause();
+                cancelAnimationFrame(animationId);
+                playBtn.textContent = "Play Preview";
+            }
+        });
+
+        // Main rendering loop
+        function processVideo() {
+            if (sourceVideo.paused || sourceVideo.ended) return;
+            renderFrame();
+            animationId = requestAnimationFrame(processVideo);
+        }
+
+        function renderFrame() {
+            const width = outCanvas.width;
+            const height = outCanvas.height;
+            const size = parseInt(sizeSlider.value);
+            const shift = parseInt(shiftSlider.value);
+            const drop = dropCheckbox.checked;
+            const blurAlpha = parseFloat(blurSlider.value);
+
+            // 1. Draw raw video to temp canvas (stretched to fit chosen aspect ratio)
+            tempCtx.drawImage(sourceVideo, 0, 0, width, height);
+
+            // 2. Apply Motion Blur (Frame Blending)
+            if (blurAlpha > 0) {
+                tempCtx.globalAlpha = blurAlpha;
+                tempCtx.drawImage(blurCanvas, 0, 0, width, height);
+                tempCtx.globalAlpha = 1.0;
+                
+                // Save current blurred state for the next frame
+                blurCtx.clearRect(0, 0, width, height);
+                blurCtx.drawImage(tempCanvas, 0, 0, width, height);
+            }
+
+            // 3. Prepare final canvas
+            ctx.fillStyle = "#000";
+            ctx.fillRect(0, 0, width, height);
+
+            // 4. Interlacing Logic
+            if (size <= 0) {
+                // If size is 0, skip interlacing effect and just draw the frame normally
+                ctx.drawImage(tempCanvas, 0, 0, width, height);
+            } else {
+                for (let y = 0; y < height; y += size * 2) {
+                    // FIELD A (Current Frame - Blurred)
+                    ctx.drawImage(tempCanvas, 0, y, width, size, shift, y, width, size);
+
+                    // FIELD B (Previous Frame)
+                    if (y + size < height && !drop) {
+                        ctx.drawImage(prevFrameCanvas, 0, y + size, width, size, 0, y + size, width, size);
+                    }
+                }
+            }
+
+            // Save state for temporal interlacing
+            prevCtx.drawImage(tempCanvas, 0, 0, width, height);
+        }
+
+        // Export Download Logic
+        downloadBtn.addEventListener('click', async () => {
+            if (isProcessing) return;
+            isProcessing = true;
+            recordedChunks = [];
+            
+            initAudio(); 
+            sourceVideo.currentTime = 0;
+            
+            // Get selected FPS
+            const selectedFps = parseInt(fpsSelect.value);
+            const canvasStream = outCanvas.captureStream(selectedFps); 
+            
+            const tracks = [];
+            const videoTracks = canvasStream.getVideoTracks();
+            const audioTracks = audioDest.stream.getAudioTracks();
+            
+            if (videoTracks.length > 0) tracks.push(videoTracks[0]);
+            if (audioTracks.length > 0) tracks.push(audioTracks[0]);
+            
+            const combinedStream = new MediaStream(tracks);
+
+            let targetMimeType = 'video/webm';
+            let fileExt = 'webm';
+
+            if (MediaRecorder.isTypeSupported('video/mp4')) {
+                targetMimeType = 'video/mp4';
+                fileExt = 'mp4';
+            }
+
+            // Calculate Bitrate for Ultra High Quality based on height
+            let h = outCanvas.height;
+            let targetBitrate = 8000000; // default 8mbps
+            if (h >= 4320) targetBitrate = 120000000; // 120 mbps for 8K
+            else if (h >= 2160) targetBitrate = 60000000; // 60 mbps for 4K
+            else if (h >= 1080) targetBitrate = 20000000; // 20 mbps for 1080p
+            else if (h >= 720) targetBitrate = 10000000; // 10 mbps for 720p
+            else targetBitrate = 5000000; // 5 mbps for lower res UHQ
+
+            const options = {
+                mimeType: targetMimeType,
+                videoBitsPerSecond: targetBitrate 
+            };
+
+            try {
+                mediaRecorder = new MediaRecorder(combinedStream, options);
+            } catch (e) {
+                mediaRecorder = new MediaRecorder(combinedStream, { videoBitsPerSecond: targetBitrate }); 
+            }
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, { type: targetMimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `videomin_processed_${selectedFps}fps.${fileExt}`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                
+                isProcessing = false;
+                downloadBtn.textContent = "Download Processed Video";
+                statusText.textContent = "Download complete!";
+                playBtn.disabled = false;
+            };
+
+            playBtn.disabled = true;
+            downloadBtn.textContent = "Processing... (Please wait)";
+            statusText.textContent = "Processing video... PENTING: Jangan pindah tab (Keep this tab active!).";
+            
+            mediaRecorder.start(50);
+            sourceVideo.play();
+            processVideo();
+
+            sourceVideo.onended = () => {
+                mediaRecorder.stop();
+                cancelAnimationFrame(animationId);
+                sourceVideo.onended = null; 
+            };
+        });
+    </script>
+</body>
+</html>
